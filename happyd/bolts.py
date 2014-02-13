@@ -5,7 +5,6 @@ from happyd.peers import PeerDiscovery
 
 import random
 import sys
-import msgpack
 import zerorpc
 
 
