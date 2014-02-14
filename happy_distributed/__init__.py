@@ -1,6 +1,5 @@
 import logging
 
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -16,3 +15,5 @@ ch.setFormatter(formatter)
 
 # add ch to logger
 logger.addHandler(ch)
+
+logging.getLogger('kazoo.handlers.threading').addHandler(ch)
