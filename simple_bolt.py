@@ -3,8 +3,11 @@ from happy_distributed.server import Server
 
 
 class SimpleBolt(Bolt):
-    pass
+    connect_to = 'tcp://0.0.0.0:4242'
+
+    def handle(self, data):
+        print data
 
 server = Server(SimpleBolt('simpleBolt'))
-
+server.bind('tcp://0.0.0.0:4243')
 server.run()

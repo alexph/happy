@@ -1,9 +1,9 @@
 from happy_distributed import logger
 from happy_distributed.connections import zk
 
-import zerorpc
 import sys
 import time
+import zerorpc
 
 
 class Server(zerorpc.Server):
@@ -35,6 +35,9 @@ class Server(zerorpc.Server):
 
     def stop(self):
         self.methods_cls._unregister()
+
+        if hasattr(self.methods_cls, '_client'):
+            self.methods_cls._client.close()
 
         zk.stop()
         zk.close()
