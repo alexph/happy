@@ -24,15 +24,28 @@ def worker(call, name, input, output):
             task = input.get()
             logger.debug('Worker %s got task %s' % (name, task))
 
+            if output is not None:
+                r = call(task)
+                try:
+                    for x in r:
+                        output.put(x)
+                except TypeError:
+                    output.put(r)
+
+            '''
             if isinstance(call, types.GeneratorType):
                 for x in call(task):
                     if output is not None:
                         output.put(x)
             else:
                 x = call(task)
-
+                if type(x) == 'generator':
+                    for y in x:
+                        if output is not None:
+                            output.put(x)
                 if output is not None:
                     output.put(x)
+            '''
 
         gevent.sleep(0)
 
