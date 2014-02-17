@@ -1,8 +1,6 @@
 from happy_distributed.hub import Topology, BaseConsumer
 
 import gevent
-import random
-
 
 def my_feed():
     with open('chekhov.txt') as f:
@@ -36,8 +34,4 @@ t.set_feed('feed', my_feed)
 t.set_consumer('split', split_words)
 t.set_consumer('count', WordCount())
 t.set_consumer('printer', printer)
-# t.set_consumer('consumer2', my_consumer)
-# t.set_consumer('consumer3', my_consumer)
-# t.set_consumer('consumer4', my_consumer)
-# t.set_consumer('consumer5', my_consumer)
 t.submit()

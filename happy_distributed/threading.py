@@ -2,12 +2,7 @@ from happy_distributed import logger
 
 from gevent.queue import Queue
 
-
 import gevent
-import types
-
-
-topologies = list()
 
 
 def feed_loop(call, tasks):
@@ -32,33 +27,17 @@ def worker(call, name, input, output):
                 except TypeError:
                     output.put(r)
 
-            '''
-            if isinstance(call, types.GeneratorType):
-                for x in call(task):
-                    if output is not None:
-                        output.put(x)
-            else:
-                x = call(task)
-                if type(x) == 'generator':
-                    for y in x:
-                        if output is not None:
-                            output.put(x)
-                if output is not None:
-                    output.put(x)
-            '''
-
         gevent.sleep(0)
 
 
 class Workflow(object):
     def __init__(self, topology):
         logger.debug('Workflow: %s' % topology.name)
+
         self.topology = topology
-        self.flow = []
+        self.workflow = self.topology.workflow
 
         self.queues = []
-
-        self.workflow = self.topology.workflow
 
         order = 0
 
