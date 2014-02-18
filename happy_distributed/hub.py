@@ -2,6 +2,9 @@ from happy_distributed import logger
 from happy_distributed.threading import Workflow
 
 
+import sys
+
+
 class BaseConsumer(object):
     def handle(self, data):
         raise NotImplementedError('BaseConsumer handle method must be implemented')
@@ -22,7 +25,7 @@ class Topology(object):
 
         logger.debug('set feed %s' % name)
 
-    def set_consumer(self, name, method, grouping=[]):
+    def set_consumer(self, name, method, grouping=[], pool=1):
         if not callable(method):
             if not isinstance(method, BaseConsumer):
                 raise TypeError('Consumer must be callable or a BaseConsumer instance')
@@ -33,12 +36,18 @@ class Topology(object):
         self.workflow.append({
             'name': name,
             'method': method,
-            'grouping': grouping
+            'grouping': grouping,
+            'pool': pool
         })
 
         logger.debug('set consumer %s %s' % (name, ', '.join(grouping)))
 
     def submit(self):
         wf = Workflow(self)
-        wf.run()
+
+        try:
+            wf.run()
+        except KeyboardInterrupt:
+            sys.exit(0)
+
 

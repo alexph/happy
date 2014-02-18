@@ -1,3 +1,4 @@
+from happy_distributed import logger
 from happy_distributed.hub import Topology, BaseConsumer
 
 import gevent
@@ -26,12 +27,12 @@ class WordCount(BaseConsumer):
 
 
 def printer(data):
-    print data
+    logger.info('Word count: %s', data)
 
 
 t = Topology('myTopology')
 t.set_feed('feed', my_feed)
-t.set_consumer('split', split_words)
-t.set_consumer('count', WordCount())
-t.set_consumer('printer', printer)
+t.set_consumer('split', split_words, pool=4)
+t.set_consumer('count', WordCount(), pool=12)
+t.set_consumer('printer', printer, pool=12)
 t.submit()

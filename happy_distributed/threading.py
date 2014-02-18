@@ -1,6 +1,7 @@
 from happy_distributed import logger
 
 from gevent.queue import Queue
+from gevent.pool import Pool
 
 import gevent
 
@@ -13,19 +14,26 @@ def feed_loop(call, tasks):
         gevent.sleep(0)
 
 
-def worker(call, name, input, output):
+def worker(call, name, input, output, pool):
+    subs = Pool(pool)
+
     while True:
         if not input.empty():
-            task = input.get()
-            logger.debug('Worker %s got task %s' % (name, task))
+            def run():
+                task = input.get()
+                logger.debug('Worker %s got task %s' % (name, task))
 
-            if output is not None:
-                r = call(task)
-                try:
-                    for x in r:
-                        output.put(x)
-                except TypeError:
-                    output.put(r)
+                if output is not None:
+                    r = call(task)
+                    try:
+                        for x in r:
+                            output.put(x)
+                    except TypeError:
+                        output.put(r)
+                else:
+                    call(task)
+
+            subs.spawn(run)
 
         gevent.sleep(0)
 
@@ -69,6 +77,7 @@ class Workflow(object):
             except IndexError:
                 output = None
 
-            threads.append(gevent.spawn(worker, w['method'], w['name'], input, output))
+            threads.append(gevent.spawn(worker, w['method'], w['name'],
+                                        input, output, w['pool']))
 
         gevent.joinall(threads)
