@@ -12,6 +12,10 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
 
 
+class ProducerStreamEnd(Exception):
+    pass
+
+
 class Store(object):
     def set(name, value):
         raise NotImplementedError()
@@ -51,23 +55,32 @@ HAPPY_CONTEXT = HappyContext()
 
 class Producer(threading.Thread):
     def __init__(self, spec):
+        self.state = threading.Event()
         self.queue = Queue.Queue()
         self.spec = spec
         self.signal = True
         self._filter = lambda x: x
         self._map = lambda x: x
 
-        super(Producer, self).__init__(target=self.producer)
+        super(Producer, self).__init__(target=self.worker)
 
-    def producer(self):
+    def worker(self):
+        self.state.set()
+
         while self.signal:
-            for x in self.spec():
-                if self._filter(x):
-                    logger.debug('%s: %s' % (self.spec.__name__, x))
-                    self.queue.put(self._map(x))
+            try:
+                for x in self.spec():
+                    if self._filter(x):
+                        logger.debug('%s: %s' % (self.spec.__name__, x))
+                        self.queue.put(self._map(x))
 
-                time.sleep(0.0001)
+                    time.sleep(0.0001)
+            except ProducerStreamEnd, exc:
+                logger.info(exc)
+                break
             time.sleep(0.1)
+
+        self.state.clear()
 
     def filter(self, functor):
         self._filter = functor
@@ -86,23 +99,29 @@ class Producer(threading.Thread):
 
 
 class Consumer(threading.Thread):
-    def __init__(self, queue, spec):
+    def __init__(self, producer, queue, spec):
+        self.producer = producer
         self.queue = queue
         self.spec = spec
         self.signal = True
+
+        #
+        # Behaviour
         self._sum_key_store = False
+        self._write_to = False
 
-        super(Consumer, self).__init__(target=self.consume)
+        super(Consumer, self).__init__(target=self.worker)
 
-    def consume(self):
+    def worker(self):
         while self.signal:
             if not self.queue.empty():
                 item = self.queue.get()
 
                 logger.debug('%s: %s' % (self.spec.__name__, item))
 
-                if hasattr(item, '__getitem__'):
-                    pass
+                if self._sum_key_store:
+                    if hasattr(item, '__getitem__'):
+                        logger.debug(item.keys())
 
                 self.spec(item)
                 self.queue.task_done()
@@ -114,6 +133,9 @@ class Consumer(threading.Thread):
 
     def collect(self, store):
         pass
+
+    def write(self, output):
+        self._write_to = output
 
 
 def producer(func=None, **config):
@@ -137,7 +159,7 @@ def producer(func=None, **config):
 def consumer(producer):
     def decorator(f):
         queue = HAPPY_CONTEXT.get_queue(producer.spec.__name__)
-        consumer = Consumer(queue, f)
+        consumer = Consumer(producer, queue, f)
         HAPPY_CONTEXT.add_consumer(f.__name__, consumer)
 
         # @functools.wraps(f)
@@ -148,13 +170,30 @@ def consumer(producer):
     return decorator
 
 
+class PipelineController(threading.Thread):
+    def __init__(self, threads):
+        logger.info('%s Starting' % self.__class__.__name__)
+
+        self.threads = threads
+
+        super(PipelineController, self).__init__(target=self.worker)
+
+    def worker(self):
+        while True:
+            for x in self.threads:
+                print x.__name__, x.signal
+            time.sleep(1)
+
+
 class HappyApp(object):
     def __init__(self):
         self.threads = []
+        self.controller = None
 
     def start(self):
         for x in self.threads:
             x.start()
+        self.controller.start()
 
     def run(self):
         def signal_handler(signal, frame):
@@ -169,9 +208,14 @@ class HappyApp(object):
         for x in HAPPY_CONTEXT.producers.values():
             self.threads.append(x)
 
+        self.controller = PipelineController(self.threads)
+
         self.start()
         signal.pause()
 
     def stop(self):
+        self.controller.stop()
+        
         for x in self.threads:
             x.signal = False
+
